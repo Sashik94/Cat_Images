@@ -15,10 +15,22 @@ class ViewController: UIViewController {
     let networking = Networking()
     var catArray: [Cat]?
     
+    let myRefreshControl: UIRefreshControl = {
+        let refreshControl = UIRefreshControl()
+        refreshControl.addTarget(self, action: #selector(refresh(sender:)), for: .valueChanged)
+        return refreshControl
+    }()
+    
+    @objc private func refresh(sender: UIRefreshControl) {
+        networking.downloadImage()
+        sender.endRefreshing()
+    }
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         
         networking.delegate = self
+        tableImagesTabelView.refreshControl = myRefreshControl
         networking.downloadImage()
     }
     
@@ -42,9 +54,7 @@ extension ViewController: UITableViewDelegate, UITableViewDataSource {
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "ImageCell", for: indexPath) as! ImageTableViewCell
         
-        cell.activityIndicator.startAnimating()
-        let cat = catArray![indexPath.row]
-        cell.model = cat
+        configureCell(cell: cell, for: indexPath)
         
         return cell
     }
@@ -54,6 +64,22 @@ extension ViewController: UITableViewDelegate, UITableViewDataSource {
         let w = tableView.frame.width / CGFloat(cat.width!)
         let h = CGFloat(cat.height!) * w
         return h
+    }
+    
+    private func configureCell(cell: ImageTableViewCell, for indexPath: IndexPath) {
+        let catCell = catArray![indexPath.row]
+        cell.activityIndicator.startAnimating()
+        cell.imageImageView.image = nil
+        DispatchQueue.global(qos: .userInteractive).async {
+            guard let urlString = catCell.url else { return }
+            guard let url = URL(string: urlString) else { return }
+            let image = UIImage(data: try! Data(contentsOf: url))
+            DispatchQueue.main.async {
+                let cell = self.tableImagesTabelView.cellForRow(at: indexPath) as? ImageTableViewCell
+                cell?.imageImageView.image = image
+                cell?.activityIndicator.stopAnimating()
+            }
+        }
     }
 }
 
